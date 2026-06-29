@@ -1,6 +1,9 @@
 package io.github.ronjunevaldoz.bytesweep.di
 
+import io.github.ronjunevaldoz.bytesweep.data.AnalysisClient
+import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
+import io.github.ronjunevaldoz.bytesweep.domain.JunkAnalysisService
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.presenter.ScannerViewModel
 import org.koin.core.context.startKoin
@@ -14,6 +17,8 @@ import org.koin.dsl.module
 val appModule = module {
     singleOf(::ScanStorageUseCase)
     singleOf(::CleanJunkUseCase)
+    single<JunkAnalysisService> { AnalysisClient() }
+    singleOf(::AnalyzeJunkUseCase)
     viewModelOf(::ScannerViewModel)
 }
 

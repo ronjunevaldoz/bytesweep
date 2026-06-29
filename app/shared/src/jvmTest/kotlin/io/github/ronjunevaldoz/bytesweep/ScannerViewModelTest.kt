@@ -1,7 +1,10 @@
 package io.github.ronjunevaldoz.bytesweep
 
 import app.cash.turbine.test
+import io.github.ronjunevaldoz.bytesweep.analysis.AnalyzeResponse
+import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
+import io.github.ronjunevaldoz.bytesweep.domain.JunkAnalysisService
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.StorageScanner
 import io.github.ronjunevaldoz.bytesweep.model.JunkCategory
@@ -32,6 +35,11 @@ private class FakeScanner(
     }
 }
 
+private class FakeAnalysisService : JunkAnalysisService {
+    override suspend fun analyze(items: List<JunkItem>) =
+        AnalyzeResponse(recommendations = emptyList(), summary = "ok")
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
 
@@ -48,7 +56,11 @@ class ScannerViewModelTest {
 
     @Test
     fun `scan populates items`() = runTest {
-        val vm = ScannerViewModel(ScanStorageUseCase(FakeScanner(sample)), CleanJunkUseCase(FakeScanner(sample)))
+        val vm = ScannerViewModel(
+            ScanStorageUseCase(FakeScanner(sample)),
+            CleanJunkUseCase(FakeScanner(sample)),
+            AnalyzeJunkUseCase(FakeAnalysisService()),
+        )
         vm.state.test {
             assertEquals(ScannerContract.State(), awaitItem()) // initial
             vm.onIntent(ScannerContract.Intent.ScanClicked)
@@ -63,7 +75,11 @@ class ScannerViewModelTest {
     @Test
     fun `clean removes selected items and reports reclaimed bytes`() = runTest {
         val scanner = FakeScanner(sample)
-        val vm = ScannerViewModel(ScanStorageUseCase(scanner), CleanJunkUseCase(scanner))
+        val vm = ScannerViewModel(
+            ScanStorageUseCase(scanner),
+            CleanJunkUseCase(scanner),
+            AnalyzeJunkUseCase(FakeAnalysisService()),
+        )
         vm.onIntent(ScannerContract.Intent.ScanClicked)
         vm.state.test {
             // skip to a state that has the scanned items

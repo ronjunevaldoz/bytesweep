@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -23,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -33,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.ronjunevaldoz.bytesweep.analysis.Recommendation
+import io.github.ronjunevaldoz.bytesweep.analysis.Safety
 import io.github.ronjunevaldoz.bytesweep.getPlatform
 import io.github.ronjunevaldoz.bytesweep.model.JunkCategory
 import io.github.ronjunevaldoz.bytesweep.model.JunkItem
@@ -84,9 +88,36 @@ fun ScannerContent(
                 Text(if (state.isScanning) "Scanning…" else "Scan storage")
             }
 
-            if (state.isScanning) {
+            if (state.items.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onIntent(ScannerContract.Intent.AnalyzeClicked) },
+                    enabled = state.canAnalyze,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.isAnalyzing) "Analyzing…" else "Analyze with AI")
+                }
+            }
+
+            if (state.isScanning || state.isAnalyzing) {
                 Spacer(Modifier.height(12.dp))
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            state.analysisSummary?.let { summary ->
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("AI summary", style = MaterialTheme.typography.labelMedium)
+                        Text(summary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
             }
 
             state.error?.let { error ->
@@ -158,13 +189,17 @@ private fun ItemList(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(state.items, key = { it.id }) { item ->
-            JunkRow(item = item, onToggle = { onIntent(ScannerContract.Intent.ItemToggled(item.id)) })
+            JunkRow(
+                item = item,
+                recommendation = state.recommendations[item.id],
+                onToggle = { onIntent(ScannerContract.Intent.ItemToggled(item.id)) },
+            )
         }
     }
 }
 
 @Composable
-private fun JunkRow(item: JunkItem, onToggle: () -> Unit) {
+private fun JunkRow(item: JunkItem, recommendation: Recommendation?, onToggle: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -174,9 +209,37 @@ private fun JunkRow(item: JunkItem, onToggle: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Text(item.category.label, style = MaterialTheme.typography.bodySmall)
+                recommendation?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SafetyBadge(it.safety)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            it.reason,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             Text(formatSize(item.sizeBytes), style = MaterialTheme.typography.bodyMedium)
         }
+    }
+}
+
+@Composable
+private fun SafetyBadge(safety: Safety) {
+    val (label, color) = when (safety) {
+        Safety.SAFE -> "SAFE" to MaterialTheme.colorScheme.primary
+        Safety.CAUTION -> "CAUTION" to MaterialTheme.colorScheme.tertiary
+        Safety.KEEP -> "KEEP" to MaterialTheme.colorScheme.error
+    }
+    Surface(color = color, shape = MaterialTheme.shapes.small) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 
@@ -202,6 +265,27 @@ private fun ScannerContentResultsPreview() {
     BytesweepTheme {
         ScannerContent(
             state = ScannerContract.State(hasScanned = true, items = sampleItems),
+            snackbarHostState = remember { SnackbarHostState() },
+            onIntent = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun ScannerContentAnalyzedPreview() {
+    BytesweepTheme {
+        ScannerContent(
+            state = ScannerContract.State(
+                hasScanned = true,
+                items = sampleItems,
+                analysisSummary = "Most items are regenerable caches; review the 256 MB backup before deleting.",
+                recommendations = mapOf(
+                    "1" to Recommendation("1", Safety.SAFE, "Image cache, regenerated on demand"),
+                    "3" to Recommendation("3", Safety.SAFE, "Log file, safe to remove"),
+                    "4" to Recommendation("4", Safety.KEEP, "Looks like a user backup archive"),
+                ),
+            ),
             snackbarHostState = remember { SnackbarHostState() },
             onIntent = {},
         )

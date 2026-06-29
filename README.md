@@ -20,6 +20,31 @@ Each platform provides its own scanner via dependency injection:
 | iOS | `IosStorageScanner` | `NSCachesDirectory` + `NSTemporaryDirectory` |
 | Web (JS/WasmJs) | `DemoStorageScanner` | representative dataset (browser sandbox blocks FS access) |
 
+## AI scan analysis
+
+Bytesweep can send scan results to an LLM and get back a per-item safety
+recommendation (SAFE / CAUTION / KEEP) plus an overall summary.
+
+- The call is **proxied through the `:server` (Ktor) module** so no API key/endpoint
+  ships in the app. The client posts scan results to `POST /analyze`; the server calls
+  the model and returns structured JSON.
+- Server-side the model lives behind a `JunkAnalyzer` interface. The current
+  implementation, `OllamaAnalyzer`, calls a self-hosted Ollama via `/api/chat` with a
+  JSON schema in the `format` field. A Claude (or other) implementation can drop in
+  behind the same interface without touching the route or client.
+- Shared request/response DTOs live in `:core` (`io.github.ronjunevaldoz.bytesweep.analysis`).
+
+**Configure the server** via env vars:
+
+| Var | Default | Meaning |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `https://ron-local-home.duckdns.org/ollama` | Ollama base URL |
+| `OLLAMA_MODEL` | `qwen3:8b` | model tag to run |
+
+**Run it:** `./gradlew :server:run`, then in the app tap **Scan storage** → **Analyze with AI**.
+The client targets `http://localhost:8080` by default (`AnalysisClient.DEFAULT_BASE_URL`);
+on the Android emulator use `http://10.0.2.2:8080`.
+
 ## Architecture
 
 Clean-architecture layering inside `:app:shared` (`io.github.ronjunevaldoz.bytesweep`):
@@ -72,6 +97,18 @@ core/mvi/     MviViewModel base (StateFlow + Channel)
 - Common (`formatSize`): bundled in the common test source set.
 - iOS: `./gradlew :app:shared:iosSimulatorArm64Test`
 - Web: `./gradlew :app:shared:jsTest` / `:app:shared:wasmJsTest`
+
+### Screenshot tests (Roborazzi)
+
+Golden images for the design system and scanner screen live in
+`app/shared/src/jvmTest/snapshots/` (Desktop/JVM capture via `roborazzi-compose-desktop`).
+
+- Record/update goldens: `./gradlew :app:shared:recordRoborazziJvm`
+- Verify against goldens: `./gradlew :app:shared:verifyRoborazziJvm`
+
+> **Cross-OS note:** goldens are sensitive to OS font rendering. These were recorded on
+> macOS — re-record on the CI OS (Linux) before adding a hard `verifyRoborazziJvm` gate,
+> or keep verification on the same OS used to record.
 
 ---
 
