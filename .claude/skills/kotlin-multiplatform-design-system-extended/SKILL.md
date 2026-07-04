@@ -1,17 +1,19 @@
 ---
 name: kotlin-multiplatform-design-system-extended
 description: >
-  Extends :core:designsystem (from kotlin-multiplatform-design-system) with 27
+  Extends :core:designsystem (from kotlin-multiplatform-design-system) with 26
   production-ready components using the Compose Styles API. Covers: Icon, IconButton,
   Label, Separator, Avatar, TopAppBar, NavigationBar, Tabs, Checkbox, RadioButton,
   Switch, Slider, Select/Dropdown, Progress (linear + circular), Skeleton, Spinner,
-  Alert, Toast/Snackbar system (ToastHostState + Scaffold slot), Dialog, AlertDialog,
+  Alert, Toast/Snackbar system (AppToastHostState + Scaffold slot), Dialog, AlertDialog,
   Sheet (BottomSheet), Tooltip, Popover, Accordion/Collapsible. All components built
-  on CMP primitives (no Material3). Requires kotlin-multiplatform-design-system skill.
+  on CMP primitives (no Material3). "App" is a placeholder prefix — see the base skill's
+  Step 0 for how it is resolved from the project name (scripts/derive_component_prefix.py).
+  Requires kotlin-multiplatform-design-system skill.
 license: Apache-2.0
 metadata:
   author: kmm-agent-skills
-  last-updated: '2026-06-22'
+  last-updated: '2026-07-05'
   keywords:
     - design system extended
     - Dialog
@@ -57,7 +59,8 @@ divider, separator, icon button, form label, extended design system,
 redesign, visual consistency, UI components, component library, page components,
 add components, component set, UI kit, component design, redesign page,
 button, dialog, component, use component, add button, create component,
-show dialog, show toast, loading state, empty state, error state.
+show dialog, show toast, loading state, empty state, error state,
+circular progress, progress ring, determinate progress, indeterminate progress.
 
 **Freshness rule:** `@ExperimentalStylesApi` and CMP primitive APIs change between releases —
 recheck the Compose docs and apply the same freshness check as `kotlin-multiplatform-design-system`.
@@ -83,6 +86,9 @@ and apply the same `@ExperimentalStylesApi` token pattern as the core system.
 
 - `kotlin-multiplatform-design-system` skill already applied (tokens, AppTheme, StyleScopeExtensions, 6 core components present)
 - `:core:designsystem` module exists with `GROUP_ID.core.designsystem` package
+- The project's component prefix already resolved via the base skill's **Step 0** —
+  `App` below is the same placeholder token (`AppIconButton` → `GuildBaseIconButton`,
+  `AppToastHost` → `GuildBaseToastHost`, etc.), never a hardcoded literal
 
 ---
 
@@ -96,12 +102,12 @@ and apply the same `@ExperimentalStylesApi` token pattern as the core system.
 | Group | Components | Stability |
 |---|---|---|
 | Primitives | `AppIcon`, `AppIconButton`, `AppLabel`, `AppSeparator` | **Stable** |
-| Display | `AppAvatar`, `AppSpinner`, `AppSkeleton`, `AppProgress` | **Stable** |
+| Display | `AppAvatar`, `AppSpinner`, `AppSkeleton`, `AppProgress`, `AppCircularProgress` | **Stable** |
 | Navigation | `AppTopAppBar`, `AppNavigationBar`, `AppScaffold` | **Stable** |
 | Tabs | `AppTabs` | **Stable** |
 | Form Controls | `AppCheckbox`, `AppRadioButton`, `AppSwitch`, `AppSlider` | **Stable** |
 | Form Controls | `AppSelect` | **Experimental** — API may change |
-| Feedback | `AppAlert`, `AppToast` (with `ToastHostState` + `AppScaffold`) | **Stable** |
+| Feedback | `AppAlert`, `AppToastHost` (with `AppToastHostState` + `AppScaffold`) | **Stable** |
 | Overlays | `AppDialog`, `AppAlertDialog`, `AppSheet` | **Stable** |
 | Overlays | `AppTooltip`, `AppPopover` | **Experimental** — positioning varies by platform |
 | Expandable | `AppAccordion` | **Experimental** — animation API in flux |
@@ -109,6 +115,34 @@ and apply the same `@ExperimentalStylesApi` token pattern as the core system.
 **Stability tiers:**
 - **Stable** — API locked; breaking changes come with a migration note in the Changelog.
 - **Experimental** — API may change between skill versions; review diffs before accepting updates.
+
+### Style API coverage
+
+Not every component should expose a `style: Style` override — see the base skill's
+Component API Placement table. This is the honest per-component status so the audit
+doesn't flag correctly-exempt components as gaps:
+
+| Component | Style API status | Why |
+|---|---|---|
+| `AppIconButton` | ✅ Wired | Interactive leaf control — `rememberUpdatedStyleState` + `styleable` |
+| `AppAvatar` | ✅ Wired | Static leaf control — `style` escape hatch for one-off overrides (e.g. status ring) |
+| `AppIcon`, `AppLabel`, `AppSeparator` | ⚠️ Not yet wired | Simple data+param leaf controls; a `style` escape hatch would still be valid — candidates for a future pass |
+| `AppSpinner` | ✅ Correctly exempt | Infinite rotation animation — Styles API does not support infinite animations (see `references/compose-styles-api-reference.md` §10); uses `rememberInfiniteTransition` instead, as documented in its own docstring |
+| `AppSkeleton`, `AppProgress` | ⚠️ Not yet wired | Same infinite-animation constraint may apply to the shimmer/indeterminate variants — verify per-variant before wiring |
+| `AppCheckbox`, `AppRadioButton`, `AppSwitch` | ⚠️ Not yet wired | Custom Canvas-drawn glyphs (checkmark, dot, thumb) sit outside the Style property set (no arbitrary path-drawing property) — per Styles-vs-Modifiers guidance this is legitimately Modifier/Canvas territory; only the container chrome (background/border color per checked/enabled state) is a real Style candidate, not yet extracted |
+| `AppSlider` | ✅ Correctly exempt | Continuous drag value, not a discrete interaction state — doesn't fit the StyleState model |
+| `AppSelect` | ⚠️ Not yet wired | Leaf control candidate — dropdown chrome (background/border/shape) is stylable |
+| `AppTopAppBar`, `AppNavigationBar`, `AppScaffold`, `AppTabs` | ✅ Correctly exempt | Slot API / app-shell chrome per the base skill's Component API Placement table — caller owns content, shell stays fixed |
+| `AppAlert`, `AppToastHost` | ⚠️ Not yet wired | Variant-driven leaf controls (info/success/warning/error) — good Style candidates |
+| `AppCircularProgress` | ⚠️ Not yet wired | Same status as its sibling `AppProgress` (linear) — track/fill colors are plain params, not yet Style-driven |
+| `AppDialog`, `AppAlertDialog`, `AppSheet`, `AppTooltip`, `AppPopover` | ✅ Correctly exempt | Slot API — overlay chrome, not a themed variant leaf control |
+| `AppAccordion` | ⚠️ Not yet wired | Animation API is still in flux (Experimental tier); revisit once stabilized |
+
+**Reading this table:** ✅ means the current state is correct and should not be flagged.
+⚠️ means a real gap — a future pass should extract the container chrome (background,
+border, shape) into a `Style` value and expose a `style: Style = Style` parameter,
+following the `AppAvatar` pattern above for static components or the base skill's
+`AppButton` pattern (`rememberUpdatedStyleState` + custom state keys) for interactive ones.
 
 ---
 
@@ -339,8 +373,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.Style
+import androidx.compose.foundation.style.rememberUpdatedStyleState
 import androidx.compose.foundation.style.styleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -374,8 +408,9 @@ fun AppIconButton(
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val styleState = remember(interactionSource) { MutableStyleState(interactionSource) }
-    styleState.enabled = enabled
+    val styleState = rememberUpdatedStyleState(interactionSource) {
+        it.isEnabled = enabled
+    }
 
     Box(
         modifier = modifier
@@ -493,22 +528,23 @@ fun AppSeparator(
 ```kotlin
 package GROUP_ID.core.designsystem.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.Style
+import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.styleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import GROUP_ID.core.designsystem.theme.appTheme
+import GROUP_ID.core.designsystem.theme.colors
+import GROUP_ID.core.designsystem.theme.shapes
 
 sealed interface AvatarSize {
     val dp: Dp
@@ -518,12 +554,21 @@ sealed interface AvatarSize {
     data object Xl  : AvatarSize { override val dp = 72.dp }
 }
 
+// Default chrome — background + circular shape. Consumers override via the `style`
+// escape hatch (e.g. a border for an "online" ring) without touching this file.
+private val avatarDefaultStyle = Style {
+    background(colors.secondary)
+    shape(CircleShape)
+}
+
 /**
  * Usage:
  * ```
  * AppAvatar(initials = "RV")
  * AppAvatar(initials = "RV", size = AvatarSize.Lg)
  * AppAvatar(painter = painterResource(Res.drawable.ic_user), contentDescription = "Profile")
+ * // One-off override — e.g. an "online" ring:
+ * AppAvatar(initials = "RV", style = Style { borderWidth(2.dp); borderColor(Color.Green) })
  * ```
  */
 @Composable
@@ -533,17 +578,18 @@ fun AppAvatar(
     painter: Painter? = null,
     contentDescription: String? = null,
     size: AvatarSize = AvatarSize.Md,
+    style: Style = Style,        // ← empty; DO NOT set a default Style here
 ) {
     val theme = appTheme
+    val styleState = remember { MutableStyleState() }   // static — no interaction to track
     Box(
         modifier = modifier
             .size(size.dp)
-            .clip(CircleShape)
-            .background(theme.colors.secondary),
+            .styleable(styleState, avatarDefaultStyle, style),
         contentAlignment = Alignment.Center,
     ) {
         if (painter != null) {
-            androidx.compose.foundation.Image(
+            Image(
                 painter = painter,
                 contentDescription = contentDescription,
                 modifier = Modifier.size(size.dp),
@@ -676,7 +722,7 @@ import GROUP_ID.core.designsystem.theme.appTheme
  * Usage:
  * ```
  * AppProgress(progress = 0.75f)                // 75% filled
- * AppProgress(progress = null)                 // indeterminate — uses AppSpinner internally
+ * AppProgress(progress = null)                 // indeterminate — sweeping bar animation
  * AppProgress(progress = 0.5f, height = 8.dp)
  * ```
  */
@@ -739,6 +785,102 @@ fun AppProgress(
                     .height(height)
                     .clip(CircleShape)
                     .background(color),
+            )
+        }
+    }
+}
+```
+
+### `components/AppCircularProgress.kt`
+
+```kotlin
+package GROUP_ID.core.designsystem.components
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import GROUP_ID.core.designsystem.theme.appTheme
+
+/**
+ * Circular ring progress indicator. Pass null for indeterminate (continuously rotating
+ * arc). The determinate variant is what `AppProgress` (linear) does not cover — use
+ * this for compact/dashboard-style progress (upload %, download %, completion rings).
+ *
+ * Usage:
+ * ```
+ * AppCircularProgress(progress = 0.75f)                 // 75% ring
+ * AppCircularProgress(progress = null)                  // indeterminate — rotating arc
+ * AppCircularProgress(progress = 0.5f, size = 48.dp, strokeWidth = 4.dp)
+ * ```
+ */
+@Composable
+fun AppCircularProgress(
+    progress: Float?,
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp,
+    strokeWidth: Dp = 3.dp,
+    color: Color = appTheme.colors.primary,
+    trackColor: Color = appTheme.colors.secondary,
+) {
+    if (progress == null) {
+        // Indeterminate — rotating partial arc, same "infinite -> rememberInfiniteTransition"
+        // rule as AppSpinner: Styles API does not support infinite animations.
+        val infiniteTransition = rememberInfiniteTransition(label = "circularProgress")
+        val rotation by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "circularProgressRotation",
+        )
+        Canvas(modifier = modifier.size(size)) {
+            rotate(rotation) {
+                drawArc(
+                    color = color,
+                    startAngle = 0f,
+                    sweepAngle = 90f,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
+                )
+            }
+        }
+    } else {
+        val animatedProgress by animateFloatAsState(
+            targetValue = progress.coerceIn(0f, 1f),
+            animationSpec = tween(durationMillis = 300),
+            label = "circularProgressValue",
+        )
+        Canvas(modifier = modifier.size(size)) {
+            drawArc(
+                color = trackColor,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
+            )
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f * animatedProgress,
+                useCenter = false,
+                style = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round),
             )
         }
     }
@@ -1822,37 +1964,37 @@ import GROUP_ID.core.designsystem.theme.appTheme
 import kotlinx.coroutines.delay
 import java.util.UUID
 
-enum class ToastVariant { Default, Destructive, Success, Warning }
+enum class AppToastVariant { Default, Destructive, Success, Warning }
 
-data class ToastData(
+data class AppToastData(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
     val description: String? = null,
-    val variant: ToastVariant = ToastVariant.Default,
+    val variant: AppToastVariant = AppToastVariant.Default,
     val durationMs: Long = 3000L,
 )
 
 @Stable
-class ToastHostState {
-    val toasts = mutableStateListOf<ToastData>()
+class AppToastHostState {
+    val toasts = mutableStateListOf<AppToastData>()
 
     fun show(
         title: String,
         description: String? = null,
-        variant: ToastVariant = ToastVariant.Default,
+        variant: AppToastVariant = AppToastVariant.Default,
         durationMs: Long = 3000L,
     ) {
-        toasts.add(ToastData(title = title, description = description, variant = variant, durationMs = durationMs))
+        toasts.add(AppToastData(title = title, description = description, variant = variant, durationMs = durationMs))
     }
 
     fun dismiss(id: String) { toasts.removeAll { it.id == id } }
 }
 
-val LocalToastHostState = compositionLocalOf { ToastHostState() }
+val LocalAppToastHostState = compositionLocalOf { AppToastHostState() }
 
 @Composable
-fun ToastHost(
-    toastHostState: ToastHostState = LocalToastHostState.current,
+fun AppToastHost(
+    toastHostState: AppToastHostState = LocalAppToastHostState.current,
     modifier: Modifier = Modifier,
 ) {
     val theme = appTheme
@@ -1877,10 +2019,10 @@ fun ToastHost(
                     exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
                 ) {
                     val (bg, border, content) = when (toast.variant) {
-                        ToastVariant.Default     -> Triple(theme.colors.surface, theme.colors.border, theme.colors.onSurface)
-                        ToastVariant.Destructive -> Triple(theme.colors.destructive, theme.colors.destructive, theme.colors.onDestructive)
-                        ToastVariant.Success     -> Triple(theme.colors.success, theme.colors.success, theme.colors.onStatus)
-                        ToastVariant.Warning     -> Triple(theme.colors.warning, theme.colors.warning, theme.colors.onStatus)
+                        AppToastVariant.Default     -> Triple(theme.colors.surface, theme.colors.border, theme.colors.onSurface)
+                        AppToastVariant.Destructive -> Triple(theme.colors.destructive, theme.colors.destructive, theme.colors.onDestructive)
+                        AppToastVariant.Success     -> Triple(theme.colors.success, theme.colors.success, theme.colors.onStatus)
+                        AppToastVariant.Warning     -> Triple(theme.colors.warning, theme.colors.warning, theme.colors.onStatus)
                     }
                     Row(
                         modifier = Modifier
@@ -1928,12 +2070,12 @@ import GROUP_ID.core.designsystem.theme.AppTheme
 import GROUP_ID.core.designsystem.theme.appTheme
 
 /**
- * Root scaffold that provides: topBar, bottomBar, ToastHost.
+ * Root scaffold that provides: topBar, bottomBar, AppToastHost.
  * Always use AppScaffold to get correct Toast positioning.
  *
  * Usage:
  * ```
- * val toastState = remember { ToastHostState() }
+ * val toastState = remember { AppToastHostState() }
  * AppScaffold(
  *     toastHostState = toastState,
  *     topBar = { AppTopAppBar(title = "Home") },
@@ -1943,19 +2085,19 @@ import GROUP_ID.core.designsystem.theme.appTheme
  * }
  *
  * // Show a toast from anywhere:
- * val toastState = LocalToastHostState.current
- * Button(onClick = { toastState.show("Saved!", variant = ToastVariant.Success) }) { ... }
+ * val toastState = LocalAppToastHostState.current
+ * Button(onClick = { toastState.show("Saved!", variant = AppToastVariant.Success) }) { ... }
  * ```
  */
 @Composable
 fun AppScaffold(
     modifier: Modifier = Modifier,
-    toastHostState: ToastHostState = remember { ToastHostState() },
+    toastHostState: AppToastHostState = remember { AppToastHostState() },
     topBar: (@Composable () -> Unit)? = null,
     bottomBar: (@Composable () -> Unit)? = null,
     content: @Composable (paddingValues: androidx.compose.foundation.layout.PaddingValues) -> Unit,
 ) {
-    CompositionLocalProvider(LocalToastHostState provides toastHostState) {
+    CompositionLocalProvider(LocalAppToastHostState provides toastHostState) {
         Box(modifier = modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (topBar != null) topBar()
@@ -1965,7 +2107,7 @@ fun AppScaffold(
                 if (bottomBar != null) bottomBar()
             }
             // Toast overlay — rendered last, always on top
-            ToastHost(
+            AppToastHost(
                 toastHostState = toastHostState,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -2494,7 +2636,7 @@ Replace existing entry-point `AppTheme` wrappers:
 // androidApp/src/main/kotlin/.../MainActivity.kt
 setContent {
     AppTheme(darkTheme = isSystemInDarkTheme()) {
-        val toastState = remember { ToastHostState() }
+        val toastState = remember { AppToastHostState() }
         AppScaffold(toastHostState = toastState) { _ ->
             AppNavHost()
         }
@@ -2502,10 +2644,10 @@ setContent {
 }
 
 // Anywhere in the app — show a toast:
-val toastState = LocalToastHostState.current
+val toastState = LocalAppToastHostState.current
 LaunchedEffect(saveResult) {
     if (saveResult.isSuccess) {
-        toastState.show("Saved successfully", variant = ToastVariant.Success)
+        toastState.show("Saved successfully", variant = AppToastVariant.Success)
     }
 }
 ```
@@ -2525,7 +2667,7 @@ fun ProfileForm() {
     var notifications by remember { mutableStateOf(true) }
     var frequency by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val toast = LocalToastHostState.current
+    val toast = LocalAppToastHostState.current
 
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2550,7 +2692,7 @@ fun ProfileForm() {
         AppProgress(progress = 0.65f)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AppButton(onClick = { toast.show("Profile saved", variant = ToastVariant.Success) }) {
+            AppButton(onClick = { toast.show("Profile saved", variant = AppToastVariant.Success) }) {
                 AppText("Save changes")
             }
             AppButton(onClick = { showDeleteDialog = true }, variant = ButtonVariant.Destructive) {
@@ -2609,7 +2751,7 @@ fun SettingsPage() {
 
 ## Guidelines
 
-- **`AppScaffold` is required for Toast** — never place `ToastHost` inside a `Box` without scaffold-level z-ordering; toasts will be clipped by parent composables
+- **`AppScaffold` is required for Toast** — never place `AppToastHost` inside a `Box` without scaffold-level z-ordering; toasts will be clipped by parent composables
 - **Dialog and Sheet use `androidx.compose.ui.window.Dialog`** — works across all CMP targets; `Popup`-based overlays have WasmJs viewport positioning issues
 - **Tooltip is Desktop-first** — hover state is only available on Desktop/Web pointer devices; on touch targets the tooltip is simply never shown
 - **Slider uses `pointerInput`** not `Modifier.draggable` — `draggable` only tracks one axis and lacks tap-to-seek behavior
@@ -2700,7 +2842,7 @@ fun SettingsPage() {
 - overriding component internals via `Modifier` hacks instead of adding a variant — breaks the style contract
 - building a custom sheet or dialog without checking `AppBottomSheet` / `AppDialog` first
 - mixing Material3 components with extended design system components — creates token conflicts
-- importing `AppToastHostState` without adding it to the `AppScaffold` slot — toasts silently do nothing
+- creating an `AppToastHostState` without wiring it into the `AppScaffold` slot — toasts silently do nothing
 
 Check the component list in this skill before building a custom alternative.
 
@@ -2731,5 +2873,8 @@ Assume `kotlin-multiplatform-design-system` is already applied. Use the user's v
 
 | Date | Change |
 |---|---|
+| 2026-07-05 | Completeness audit found 3 real gaps: (1) the Toast/Snackbar subsystem (`ToastHost`, `ToastHostState`, `ToastData`, `ToastVariant`, `LocalToastHostState`) never carried the `App` prefix at all — renamed to `AppToastHost`/`AppToastHostState`/`AppToastData`/`AppToastVariant`/`LocalAppToastHostState` and fixed a resulting double-prefix typo in Common Anti-Patterns; (2) the skill promised "Progress (linear + circular)" but only linear existed — added `AppCircularProgress` (determinate ring + indeterminate rotating arc, same infinite-animation constraint as `AppSpinner`) and fixed `AppProgress`'s docstring, which falsely claimed it delegated to `AppSpinner` for the indeterminate case; (3) description claimed "27 components" — corrected to the accurate count (26). Added the `App`-is-a-placeholder cross-reference to Prerequisites and the frontmatter description, matching the base skill's Step 0. |
+| 2026-07-05 | Added "Style API coverage" table classifying all 24 components (wired / correctly slot-API-exempt / correctly exempt due to a real limitation / not-yet-wired) so the audit's Style-compliance detectors don't flag legitimate exemptions as gaps. Wired `AppAvatar` (was importing `Style`/`MutableStyleState`/`styleable` unused — dead code from an unfinished wiring attempt): added a `style: Style = Style` escape hatch and an `avatarDefaultStyle` for its background/shape. |
+| 2026-07-05 | Fixed `AppIconButton`: `styleState.enabled = enabled` used the wrong property name and a non-idiomatic construction — corrected to `rememberUpdatedStyleState(interactionSource) { it.isEnabled = enabled }` per the official Compose Styles API docs (see base skill's `references/compose-styles-api-reference.md`). |
 | 2026-06-22 | Renamed all `TextStyle.` references → `AppTextStyle.` to align with base skill rename. |
 | 2026-06-06 | Initial release. |

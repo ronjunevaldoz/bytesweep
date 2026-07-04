@@ -9,12 +9,13 @@ description: >
   shadcn-inspired sealed variant systems (ButtonVariant, CardVariant, BadgeVariant,
   ChipVariant, TextFieldVariant), AppTextStyle enum (no Compose TextStyle collision),
   and 6 core components (AppButton, AppCard, AppTextField, AppChip, AppBadge, AppText)
-  built on BasicXxx CMP primitives.
+  built on BasicXxx CMP primitives. "App" is a placeholder prefix derived from the
+  project's actual name (scripts/derive_component_prefix.py), not a hardcoded literal.
   No Material dependency — fully custom, fully owned.
 license: Apache-2.0
 metadata:
   author: kmm-agent-skills
-  last-updated: '2026-06-26'
+  last-updated: '2026-07-05'
   keywords:
     - design system
     - Compose Styles API
@@ -31,6 +32,14 @@ metadata:
     - token system
     - UI components
     - core:designsystem
+    - rememberUpdatedStyleState
+    - StyleStateKey
+    - Style vs Modifier
+    - component prefix
+    - COMPONENT_PREFIX
+    - rename App prefix
+    - custom prefix design system
+    - project-based prefix
 ---
 
 ## When to Use This Skill
@@ -50,10 +59,31 @@ typography system, spacing tokens, custom button style, Material3 alternative,
 app theme setup, brand colors, design token system, custom typography,
 redesign, visual consistency, UI consistency, design consistency, page design,
 screen design, UI look and feel, consistent styling, style guide, branding,
-component library, theming, color palette, visual identity.
+component library, theming, color palette, visual identity,
+dark mode toggle, in-app theme override, user theme preference, theme settings,
+LocalAppDarkTheme, isSystemInDarkTheme, system dark mode, follow system theme,
+dynamic theme, runtime theme switch, light dark switch, theme preference setting,
+component prefix, custom prefix instead of App, rename App to project name,
+project-specific component names, COMPONENT_PREFIX, derive prefix from project name.
 
-**Freshness rule:** `@ExperimentalStylesApi` is experimental and the Compose Styles API
-changes between CMP releases — recheck the Compose docs before upgrading.
+**Freshness rule:** `@ExperimentalStylesApi` is experimental (Android Jetpack Compose
+`1.12.0-alpha03` at last check) and the Styles API changes between releases — Material
+Design support for Styles is planned but not yet available. Recheck the official docs
+before upgrading, and note these are Android Jetpack Compose docs; Compose Multiplatform
+(JetBrains) support may lag behind:
+- https://developer.android.com/develop/ui/compose/styles (overview)
+- https://developer.android.com/develop/ui/compose/styles/fundamentals
+- https://developer.android.com/develop/ui/compose/styles/state-animations
+- https://developer.android.com/develop/ui/compose/styles/styles-vs-modifiers
+- https://developer.android.com/develop/ui/compose/styles/theming
+- https://developer.android.com/develop/ui/compose/styles/performance
+- https://developer.android.com/develop/ui/compose/styles/dos-donts
+- https://developer.android.com/develop/ui/compose/styles/examples
+- https://developer.android.com/develop/ui/compose/styles/limitations
+
+A full extracted summary of these pages (API surface, do's/don'ts, benchmarks,
+limitations) lives in `references/compose-styles-api-reference.md` — use it to audit
+generated code against the official guidance without re-fetching every page.
 
 ---
 
@@ -196,20 +226,20 @@ This gives full brand control without forking a library.
 
 | Layer | Ownership | Update path |
 |---|---|---|
-| `tokens/` — `AppColors`, `AppTypography`, `AppShapes`, `AppSpacing` | **Project-owned** | Customize freely — never touched by `/kmm-update-design-system` |
+| `tokens/` — `AppColors`, `AppTypography`, `AppShapes`, `AppSpacing` | **Project-owned** | Customize freely — never touched by `/update-design-system` |
 | `theme/` — `AppTheme`, `StyleScopeExtensions` | **Project-owned** | Customize freely |
-| `components/` — `App*.kt` | **Skill-owned** | Run `/kmm-update-design-system` to pull in bug fixes and new variants without touching tokens |
+| `components/` — `App*.kt` | **Skill-owned** | Run `/update-design-system` to pull in bug fixes and new variants without touching tokens |
 
 **Why not a published library?** The Compose Styles API (`@ExperimentalStylesApi`) changes
 between CMP releases. A published library would break every downstream project on CMP upgrades.
 The scaffold approach keeps each project on its own upgrade schedule.
 
-Use `/kmm-update-design-system` to compare your project's components against the latest skill
+Use `/update-design-system` to compare your project's components against the latest skill
 version and selectively apply fixes. The comparison is powered by
 `scripts/update_design_system.py`, which MD5-hashes each component block from this SKILL.md
 against the project file and reports CURRENT / MODIFIED / MISSING status.
 
-Use `/kmm-fix-design` to scan an existing project for violations (hardcoded colors, hardcoded
+Use `/fix-design` to scan an existing project for violations (hardcoded colors, hardcoded
 user-facing strings, dp literals, `MaterialTheme.*` usage, `TextStyle()` construction,
 nested containers, component reimplementations, direct token imports) and fix them
 file-by-file with per-file
@@ -218,8 +248,8 @@ The fallback scanner also flags missing preview stubs, missing multi-device prev
 and missing Roborazzi screenshot tests for feature `*Content.kt` files so preview drift gets
 caught with the rest of the design cleanup.
 
-Use `/kmm-record-design-baselines` after fixing to record new Roborazzi golden PNGs.
-Use `/kmm-audit-design-visual` to run a vision pass over the goldens and catch spacing,
+Use `/record-design-baselines` after fixing to record new Roborazzi golden PNGs.
+Use `/audit-design-visual` to run a vision pass over the goldens and catch spacing,
 contrast, and cross-screen consistency issues that have no code-level signal.
 
 ### Project documentation template
@@ -229,7 +259,7 @@ and fill it in. This living document records your token values, component invent
 detekt rule overrides, multi-device preview coverage, and audit log.
 
 The skill reads `docs/design-system.md` when it exists and uses it to:
-- Infer your component prefix (e.g. `Acme` instead of `App`)
+- Read your confirmed component prefix (e.g. `Acme` instead of `App`) — highest precedence in Step 0
 - Confirm your token names before generating code
 - Detect deviations you've documented as intentional
 
@@ -255,18 +285,27 @@ the token values for your brand.
 
 ## Naming Rule
 
-- Keep the `App` prefix for shared design-system primitives only.
+- `App` is a placeholder for the project's actual component prefix — see Step 0 for how
+  to resolve it (docs/design-system.md → user-stated → derived from project name → `App`
+  fallback). Never leave literal `App*` names in a real project without resolving this first.
+- Keep the resolved prefix for shared design-system primitives only.
 - Use plain names for feature-local or page-local components.
 - Do not over-prefix layouts, canvases, or state models.
 - Reserve the prefix for reusable primitives that live in `:core:designsystem`.
 
 **Key API facts:**
-- `Style { ... }` — lambda-based style descriptor; runs in Layout/Draw phase (not Composition)
-- `style1 then style2` — merges styles; last-write-wins per property
-- `Modifier.styleable(styleState, defaultStyle, overrideStyle)` — applies styles to a node
-- `MutableStyleState(interactionSource)` — tracks hover/press/focus/disabled states
-- `StyleScope` extensions — the **only** correct way to read `CompositionLocal` values inside a Style
+- `Style { ... }` — lambda-based style descriptor; runs in Layout/Draw phase (not Composition), skipping recomposition entirely for property changes
+- `style1 then style2` — merges styles; properties are **not additive** — last-write-wins per property, same as CSS cascade
+- `Modifier.styleable(styleState, defaultStyle, overrideStyle)` — applies styles to a node; also works directly on layout composables (`Row`, `Column`, `Box`) that have no built-in `style` parameter
+- `rememberUpdatedStyleState(interactionSource) { it.isEnabled = enabled }` — the sanctioned way to create a `StyleState` that stays current across recomposition; **the property is `isEnabled`, not `enabled`**
+- `MutableStyleState(interactionSource)` — lower-level constructor; prefer `rememberUpdatedStyleState` in components so `isEnabled`/custom state updates are never stale
+- Built-in interaction states: `hovered {}`, `pressed {}`, `focused {}`, `selected {}`, `enabled`/`isEnabled` (query, not typically its own block), `toggled {}` — states can nest (e.g. `hovered { pressed { … } }` for hover+press combined)
+- Custom states: define a `StyleStateKey(default)`, add a `var MutableStyleState.yourState` extension, and a `StyleScope.yourStateBlock {}` extension using `state(key, block, predicate)`
+- `animate { ... }` inside a state block — animates the wrapped properties automatically; `animate(spring(...)) { ... }` or `animate(tween(...)) { ... }` for a custom `AnimationSpec`
+- `StyleScope` extensions — the **only** correct way to read `CompositionLocal` values inside a Style (reading a `CompositionLocal` directly inside a `@Composable fun somethingStyle(): Style { ... }` captures a stale value — see Common Anti-Patterns)
+- Style property inheritance priority (highest to lowest): **direct composable argument** (`AppText(color = ...)`) > **`style` parameter** > **`Modifier.styleable {}` chain** > **parent/inherited typography-color properties**
 - All Styles API classes require `@OptIn(ExperimentalStylesApi::class)`
+- Full official reference: `references/compose-styles-api-reference.md` in this skill
 
 ---
 
@@ -275,6 +314,62 @@ the token values for your brand.
 - Project scaffolded with `kotlin-multiplatform-feature-scaffold`
 - CMP 1.11.1+ (`compose-multiplatform = "1.11.1"` in `libs.versions.toml`)
 - Convention plugin `GROUP_ID.feature.ui` or `GROUP_ID.core` available
+
+---
+
+## Step 0: Determine the component prefix
+
+> **Hard rule — never violated:** `App` (as in `AppButton`, `AppTheme`, `AppColors`) is a
+> **template placeholder in this SKILL.md**, exactly like `GROUP_ID`. It must never be
+> written to disk literally for a real project. Do not generate a file named
+> `AppButton.kt` containing `class AppButton` for an actual project and leave a mental
+> note to rename it later — resolve the real prefix FIRST (this step), then write every
+> file directly with that name the first time. There is no "rename pass" step because
+> there should be nothing left to rename.
+>
+> The only time literal `App*` is correct output is when the resolved prefix in the
+> precedence below genuinely computes to `App` (rare — only for placeholder/example
+> projects with no real name yet), or when working inside this skills repo itself,
+> where `App` is the documented template convention on purpose.
+
+**Precedence (highest to lowest):**
+
+1. `COMPONENT_PREFIX` already recorded in `docs/design-system.md`, if that file exists — an explicit, previously-confirmed choice always wins
+2. A prefix the user states directly in the request ("call it Acme", "use GB as the prefix")
+3. Derived from the project name via the script below
+4. `App` — only if nothing else yields a usable word (e.g. a genuine placeholder/example project)
+
+**Run the derivation script** (steps 3–4 are deterministic, not a guess):
+
+```bash
+python3 ~/.claude/skills/kotlin-multiplatform-design-system/scripts/derive_component_prefix.py <project_root>
+```
+
+If running from inside kmm-agent-skills:
+```bash
+python3 skills/kotlin-multiplatform-design-system/scripts/derive_component_prefix.py <project_root>
+```
+
+The script reads, in order: `settings.gradle.kts` `rootProject.name` → the Gradle group
+ID's last segment → the project directory name — strips generic noise words (`app`,
+`android`, `ios`, `kmp`, `shared`, `compose`, `project`, `multiplatform`, `mobile`,
+`client`, `core`, `main`), PascalCases what remains, and prints the result plus which
+source it came from. Example: `rootProject.name = "GuildBase"` → prefix `GuildBase` →
+`GuildBaseButton`, `GuildBaseCard`, `GuildBaseTextField`.
+
+**Confirm before generating.** Show the derived prefix and its source, then ask the user
+to confirm or override — a wrong prefix means regenerating every file, not a quick rename.
+Once confirmed, record it in `docs/design-system.md` (`COMPONENT_PREFIX` field) so future
+sessions read it from precedence step 1 instead of re-deriving.
+
+**Then generate directly with the resolved name.** Every code block in Steps 1–9 below
+shows `App` for template readability — when you actually write a file for a real project,
+substitute the resolved prefix as you write it (`AppButton.kt` → `GuildBaseButton.kt`,
+`class AppTheme` → `class GuildBaseTheme`), in the same pass, not as a follow-up edit.
+The audit enforces this: `design system prefix mismatch` flags any `App*` class/fun/object
+declaration under `core/designsystem` when `docs/design-system.md` records a different
+`COMPONENT_PREFIX` — a real mismatch, not template text, since the audit only scans
+actual `.kt` files in the target project.
 
 ---
 
@@ -311,7 +406,7 @@ include(":core:designsystem")
 
 ## Step 2: Design Tokens
 
-> **Project-owned.** Customize `tokens/` and `theme/` freely — `/kmm-update-design-system`
+> **Project-owned.** Customize `tokens/` and `theme/` freely — `/update-design-system`
 > will never modify these files. This is your brand layer.
 
 ### Palette guidance
@@ -535,10 +630,12 @@ data class AppSpacing(
 ```kotlin
 package GROUP_ID.core.designsystem.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import GROUP_ID.core.designsystem.tokens.AppColors
 import GROUP_ID.core.designsystem.tokens.AppShapes
@@ -559,24 +656,42 @@ data class AppTheme(
             staticCompositionLocalOf { AppTheme.light() }
 
         fun light(
-            colors: AppColors     = LightColors,
+            colors: AppColors         = LightColors,
             typography: AppTypography = AppTypography(),
-            shapes: AppShapes     = AppShapes(),
-            spacing: AppSpacing   = AppSpacing(),
+            shapes: AppShapes         = AppShapes(),
+            spacing: AppSpacing       = AppSpacing(),
         ) = AppTheme(colors, typography, shapes, spacing)
 
         fun dark(
-            colors: AppColors     = DarkColors,
+            colors: AppColors         = DarkColors,
             typography: AppTypography = AppTypography(),
-            shapes: AppShapes     = AppShapes(),
-            spacing: AppSpacing   = AppSpacing(),
+            shapes: AppShapes         = AppShapes(),
+            spacing: AppSpacing       = AppSpacing(),
         ) = AppTheme(colors, typography, shapes, spacing)
     }
 }
 
+/**
+ * Holds an in-app dark-mode override (true/false) set by a user settings toggle.
+ * Null means "follow the system". Read via [LocalAppDarkTheme.current].
+ *
+ * Usage:
+ * ```
+ * // In your settings screen, persist and surface the override:
+ * CompositionLocalProvider(LocalAppDarkTheme provides userPrefersDark) {
+ *     AppTheme { ... }
+ * }
+ * ```
+ */
+val LocalAppDarkTheme = compositionLocalOf<Boolean?> { null }
+
+/**
+ * Root theme wrapper. Defaults to system dark-mode on all platforms.
+ * An in-app override can be injected via [LocalAppDarkTheme].
+ */
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = LocalAppDarkTheme.current ?: isSystemInDarkTheme(),
     theme: AppTheme = if (darkTheme) AppTheme.dark() else AppTheme.light(),
     content: @Composable () -> Unit,
 ) {
@@ -1027,7 +1142,7 @@ sealed interface TextFieldVariant {
 
 ## Step 6: Core Components
 
-> **Skill-owned.** Components are updateable via `/kmm-update-design-system`. Avoid deep
+> **Skill-owned.** Components are updateable via `/update-design-system`. Avoid deep
 > customisations here — put brand-specific variants in project-level composables that
 > wrap these primitives instead.
 
@@ -1052,8 +1167,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.Style
+import androidx.compose.foundation.style.rememberUpdatedStyleState
 import androidx.compose.foundation.style.styleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -1087,10 +1202,11 @@ fun AppButton(
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val styleState = remember(interactionSource) { MutableStyleState(interactionSource) }
-
-    // Propagate enabled state to StyleState for `disabled {}` blocks
-    styleState.enabled = enabled
+    // rememberUpdatedStyleState keeps isEnabled current across recomposition without
+    // recreating the StyleState — the sanctioned pattern from the official Styles API docs.
+    val styleState = rememberUpdatedStyleState(interactionSource) {
+        it.isEnabled = enabled
+    }
 
     Box(
         modifier = modifier
@@ -1253,8 +1369,8 @@ package GROUP_ID.core.designsystem.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.Style
+import androidx.compose.foundation.style.rememberUpdatedStyleState
 import androidx.compose.foundation.style.styleable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -1283,8 +1399,9 @@ fun AppChip(
     style: Style = Style,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val styleState = remember(interactionSource) { MutableStyleState(interactionSource) }
-    styleState.enabled = enabled
+    val styleState = rememberUpdatedStyleState(interactionSource) {
+        it.isEnabled = enabled
+    }
 
     val clickableModifier = if (onClick != null) {
         Modifier.clickable(
@@ -1321,8 +1438,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.style.ExperimentalStylesApi
-import androidx.compose.foundation.style.MutableStyleState
 import androidx.compose.foundation.style.Style
+import androidx.compose.foundation.style.rememberUpdatedStyleState
 import androidx.compose.foundation.style.styleable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -1366,8 +1483,9 @@ fun AppTextField(
     singleLine: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val styleState = remember(interactionSource) { MutableStyleState(interactionSource) }
-    styleState.enabled = enabled
+    val styleState = rememberUpdatedStyleState(interactionSource) {
+        it.isEnabled = enabled
+    }
 
     val errorStyle = if (isError) Style { borderColor(colors.error) } else Style
 
@@ -1500,7 +1618,7 @@ These previews serve three purposes:
    (`./gradlew :desktopApp:run` or Android Studio compose preview)
 2. **Roborazzi per-component goldens** — captured by
    `./gradlew :core:designsystem:jvmTest`, producing one PNG per state
-3. **`/kmm-fix-design` verification** — after a theme token change, run
+3. **`/fix-design` verification** — after a theme token change, run
    `:core:designsystem:jvmTest` to confirm all components still look correct
    before running full feature tests
 
@@ -1508,7 +1626,7 @@ Feature UI modules follow the same rule: every `*Content.kt` must have a preview
 matching Roborazzi screenshot coverage for phone, tablet, and desktop sizes.
 
 > **Skill-owned.** Preview files follow the same ownership rule as components —
-> updateable via `/kmm-update-design-system`. Never edit preview files to reflect
+> updateable via `/update-design-system`. Never edit preview files to reflect
 > project-specific states; create separate preview composables in the feature UI module.
 
 ---
@@ -1948,7 +2066,7 @@ fun AppTextDarkPreview() {
 
 ```kotlin
 setContent {
-    AppTheme(darkTheme = isSystemInDarkTheme()) {
+    AppTheme {          // isSystemInDarkTheme() is the default — no argument needed
         AppNavHost()
     }
 }
@@ -1959,7 +2077,7 @@ setContent {
 ```kotlin
 application {
     Window(onCloseRequest = ::exitApplication, title = "App") {
-        AppTheme(darkTheme = false) {
+        AppTheme {      // isSystemInDarkTheme() reads OS dark mode on JVM via AWT
             AppNavHost()
         }
     }
@@ -1971,11 +2089,28 @@ application {
 ```kotlin
 @Composable
 fun AppView() {
+    AppTheme {          // isSystemInDarkTheme() reads UITraitCollection on iOS
+        AppNavHost()
+    }
+}
+```
+
+### In-app theme toggle (settings screen)
+
+To let users override the system theme, wrap `AppTheme` with `LocalAppDarkTheme`:
+
+```kotlin
+// Read the user's preference from DataStore / shared prefs:
+val userDarkMode: Boolean? by viewModel.darkModePreference.collectAsStateWithLifecycle()
+
+CompositionLocalProvider(LocalAppDarkTheme provides userDarkMode) {
     AppTheme {
         AppNavHost()
     }
 }
 ```
+
+`null` = follow system, `true` = always dark, `false` = always light.
 
 ---
 
@@ -2098,7 +2233,7 @@ All of these are already in `compose-multiplatform`. No new catalog entries requ
 - **`@OptIn(ExperimentalStylesApi::class)`** required on every file using the Styles API; add to each component/style file
 - **`indication = null`** on all clickable components — let Style `pressed {}` / `hovered {}` blocks handle visual feedback
 - **Infinite animations** are not supported in Styles — use `rememberInfiniteTransition()` in the component body instead
-- **Disabled state**: set `styleState.enabled = enabled` after creating `MutableStyleState`
+- **Disabled state**: use `rememberUpdatedStyleState(interactionSource) { it.isEnabled = enabled }` — not `MutableStyleState(interactionSource)` followed by manual mutation, and not `.enabled` (the property is `isEnabled`)
 - **Dark mode**: swap `AppTheme.dark()` vs `AppTheme.light()` at the entry point; all Styles pick up correct tokens automatically via `StyleScope` extensions
 
 ---
@@ -2268,8 +2403,9 @@ Customize `config/detekt-design-system.yml`:
 design-system:
   ComponentRegistryRule:
     active: true
-    # Match your project's design system prefix (default: App)
-    componentPrefix: 'App'
+    # Must match the prefix resolved in Step 0 (Acme, GuildBase, ...) — not the literal
+    # word "App" unless that's genuinely what Step 0 resolved to for this project.
+    componentPrefix: 'Acme'
   HardcodedDp:
     active: true
     # To disable dp warnings while keeping color/MaterialTheme errors:
@@ -2302,6 +2438,14 @@ not `ComponentRegistryViolation` or `DesignTokenImportBoundary`.
 - defining component variants as boolean parameters (`isOutlined`, `isDanger`) — use a sealed variant class
 - putting design system tokens in `:feature:*` modules — tokens belong in `:core:designsystem` only
 - skipping the `StyleScope` extension layer — leads to token access scattered across composables
+- reading a `CompositionLocal` directly inside a `@Composable fun somethingStyle(): Style { val c = MaterialTheme.colorScheme.background; return Style { background(c) } }` — the value is captured at definition time, not consume time, and goes stale when the theme changes; always read the token via a `StyleScope` extension inside the `Style { }` body instead
+- using `styleState.enabled = enabled` or a raw `MutableStyleState(interactionSource)` + manual mutation — the property is `isEnabled`, and `rememberUpdatedStyleState(interactionSource) { it.isEnabled = enabled }` is the sanctioned pattern that stays current across recomposition
+- providing a default with a body — `style: Style = Style { background(Color.Red) }` as a parameter default; always declare `style: Style = Style` (empty) and merge project defaults inside via `defaultStyle then style` in `Modifier.styleable(...)`
+- using a Style to hold click handling, gesture detection, or other business logic — Styles are visual-only; behavior belongs on `Modifier.clickable`/gesture modifiers
+- adding a `style: Style` parameter to a screen-level or raw layout composable (`FooContent`, `FooScreen`, a bare `Column`/`Row` used as page structure) — Styles are for components, not layouts; the official docs call this out explicitly as unclear to callers
+- using `pressed {}` / `hovered {}` without `indication = null` on the same `clickable` modifier — both the Style animation and the default ripple render simultaneously, producing a visibly doubled effect
+- animating an unbounded/looping effect (a pulsing loader, a spinner) inside a Style's `animate {}` block — Styles cannot express infinite animations; use `rememberInfiniteTransition()` in the component body instead
+- defining a custom `Shape` inside a Style or animating a shape transition — custom shapes and shape animation are not yet supported by the Styles API (tracked as a future fix, not currently available)
 
 If the design system feels inconsistent, check: (1) are all pages using `AppScaffold` + `AppTopAppBar`? (2) are spacing and colors coming from tokens or from hardcoded literals? (3) is there duplicated chrome (title, actions) in the content body?
 
@@ -2314,6 +2458,8 @@ The `references/` directory contains project-facing documents the skill uses at 
 | File | Purpose | Usage |
 |---|---|---|
 | `references/design-system-template.md` | Living design system doc — tokens, component inventory, detekt overrides, audit log | Copy to `docs/design-system.md` in your project; fill in token values and prefix |
+| `references/compose-styles-api-reference.md` | Extracted ground truth from the 9 official Compose Styles API doc pages (API surface, do's/don'ts, performance benchmarks, limitations) | Audit generated Style code against this before applying `/update-design-system` or reviewing a PR that touches `styles/` or `components/` |
+| `scripts/derive_component_prefix.py` | Deterministically derives the component prefix (`App` placeholder replacement) from the project name | Run in Step 0 before generating any code; see precedence order there |
 
 The skill reads `docs/design-system.md` when it exists in the target project to infer
 the component prefix and token names before generating code. If the file is absent,
@@ -2347,11 +2493,16 @@ Keep snippets small. Use the user's package name and token names when provided.
 
 | Date | Change |
 |---|---|
+| 2026-07-05 | Hardened Step 0 into a non-negotiable rule: `App` must never be written to disk literally for a real project — generate directly with the resolved prefix in the same pass, no "rename later" step. New audit detector `design system prefix mismatch [HIGH]` catches the case where `docs/design-system.md` records a resolved `COMPONENT_PREFIX` but `App*`-named declarations still exist under `core/designsystem` — verified against 5 scenarios (mismatch, consistent, genuinely-App, no-doc, unfilled-template). |
+| 2026-07-05 | Auditing complete for Style API compliance: `audit_project.py` now has 5 dedicated detectors (`style default with body`, `style state wrong enabled property`, `style param on screen composable`, `stale compositionlocal in style function`, `missing indication null with style state`) enforcing the Do's/Don'ts/Limitations in `references/compose-styles-api-reference.md`. All verified with positive + negative test cases. `design-system-extended` audited component-by-component for actual Style API wiring — see its new "Style API coverage" table; `AppAvatar` fixed (had dead unused Style imports from an unfinished wiring attempt). |
+| 2026-07-05 | Added new Step 0 — "App" is now formalized as a placeholder token (like `GROUP_ID`), resolved via precedence: `docs/design-system.md` COMPONENT_PREFIX -> user-stated -> derived from the project name -> `App` fallback. New `scripts/derive_component_prefix.py` deterministically derives a PascalCase prefix from `settings.gradle.kts` rootProject.name, the Gradle group ID, or the directory name, stripping generic noise words (app, android, ios, kmp, shared, compose, ...). Updated the Naming Rule, `docs/design-system.md` guidance, and the detekt `componentPrefix` example to stop treating `'App'` as a hardcoded literal. |
+| 2026-07-05 | Audited against the 9 official Compose Styles API doc pages; added `references/compose-styles-api-reference.md` as ground truth for future audits. Fixed a real bug found across `AppButton`/`AppChip`/`AppTextField`/Guidelines: `styleState.enabled = enabled` used the wrong property name and a non-idiomatic construction pattern — corrected to `rememberUpdatedStyleState(interactionSource) { it.isEnabled = enabled }` per the official examples. Added Style inheritance priority order, built-in/custom state facts, and 6 new anti-patterns backed by official Don'ts and Limitations (stale CompositionLocal capture in a `@Composable fun …Style()`, default-with-body style params, business logic in Styles, Style params on layout/screen composables, missing `indication = null` double-ripple, unsupported infinite/shape animation). Expanded Freshness rule with direct links to all 9 pages and the CMP-may-lag-Android caveat. |
+| 2026-06-29 | `AppTheme` default changed from `darkTheme = false` to `isSystemInDarkTheme()` — all platforms now follow system dark mode automatically. Added `LocalAppDarkTheme` composition local (`Boolean?`) for in-app theme override. Removed hardcoded `darkTheme = false` from Desktop/iOS Step 7 wiring. |
 | 2026-06-26 | Added component API placement guidance that maps shell components to slots, guarded regions to restricted scope templates, and leaf controls to data/variant APIs. |
 | 2026-06-22 | Added `references/design-system-template.md` — project-facing living document covering tokens, component inventory, detekt overrides, multi-device preview coverage, and audit log. Wired copy instructions into Ownership Model section. |
-| 2026-06-22 | Added `RedundantScreenTitleRule` (flags `Text`/`AppText` with string literals inside `*Content`/`*Screen` composables) and `HardcodedGridColumnsRule` (flags `GridCells.Fixed(N≥2)`). Added `@MultiDevicePreview` annotation (phone 360dp / tablet 673dp / desktop 1280dp) to `AppThemePreviewWrapper.kt`; applied to base light/dark variants of all 6 core component previews. Updated `/kmm-audit-design-visual` with duplicate title check and multi-device layout table. Updated `/kmm-record-design-baselines` with multi-device PNG naming. |
-| 2026-06-22 | Added `detekt-rules/` PSI-based scanner module with 7 rules (HardcodedColor, HardcodedDp, MaterialThemeUsage, DirectTextStyle, NestedContainer, ComponentRegistryViolation, DesignTokenImportBoundary). Added `/kmm-record-design-baselines` and `/kmm-audit-design-visual` commands. Updated `/kmm-fix-design` to use detekt as primary scanner. |
-| 2026-06-22 | Added `scripts/scan_design_violations.py` and `/kmm-fix-design` command: scans Compose files for hardcoded colors/dp/MaterialTheme/nested containers, fixes file-by-file, verifies with Roborazzi vision. |
+| 2026-06-22 | Added `RedundantScreenTitleRule` (flags `Text`/`AppText` with string literals inside `*Content`/`*Screen` composables) and `HardcodedGridColumnsRule` (flags `GridCells.Fixed(N≥2)`). Added `@MultiDevicePreview` annotation (phone 360dp / tablet 673dp / desktop 1280dp) to `AppThemePreviewWrapper.kt`; applied to base light/dark variants of all 6 core component previews. Updated `/audit-design-visual` with duplicate title check and multi-device layout table. Updated `/record-design-baselines` with multi-device PNG naming. |
+| 2026-06-22 | Added `detekt-rules/` PSI-based scanner module with 7 rules (HardcodedColor, HardcodedDp, MaterialThemeUsage, DirectTextStyle, NestedContainer, ComponentRegistryViolation, DesignTokenImportBoundary). Added `/record-design-baselines` and `/audit-design-visual` commands. Updated `/fix-design` to use detekt as primary scanner. |
+| 2026-06-22 | Added `scripts/scan_design_violations.py` and `/fix-design` command: scans Compose files for hardcoded colors/dp/MaterialTheme/nested containers, fixes file-by-file, verifies with Roborazzi vision. |
 | 2026-06-22 | Added ownership model section (project-owned tokens vs skill-owned components). Added stability tiers to component overview. Added `scripts/update_design_system.py` reference. |
 | 2026-06-22 | Added `AppTextField` component (was missing from Step 6). Renamed `TextStyle` enum → `AppTextStyle` to avoid Compose collision. Fixed test code: `AppTheme.spacing.*` → `appTheme.*`, `Text()` → `AppText()`. Added `@OptIn` note to Steps 5–6. Fixed missing `sp`/`FontWeight` imports in Button/Badge/Chip/TextField style snippets. Fixed `CardSize` hardcoded dp → `AppSpacing()` tokens. Added cross-skill note for `AppScaffold`/`AppTopAppBar`. |
 | 2026-06-06 | Initial release. |
