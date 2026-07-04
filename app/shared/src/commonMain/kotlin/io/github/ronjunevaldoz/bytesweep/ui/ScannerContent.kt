@@ -1,5 +1,6 @@
 package io.github.ronjunevaldoz.bytesweep.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -88,14 +93,16 @@ fun ScannerContent(
                 Text(if (state.isScanning) "Scanning…" else "Scan storage")
             }
 
+            // Low-priority, optional AI analysis — a subtle text action, not co-equal with Scan.
             if (state.items.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
+                TextButton(
                     onClick = { onIntent(ScannerContract.Intent.AnalyzeClicked) },
                     enabled = state.canAnalyze,
-                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (state.isAnalyzing) "Analyzing…" else "Analyze with AI")
+                    Text(
+                        if (state.isAnalyzing) "Analyzing…" else "Analyze with AI (optional)",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
                 }
             }
 
@@ -173,6 +180,13 @@ private fun ItemList(
     state: ScannerContract.State,
     onIntent: (ScannerContract.Intent) -> Unit,
 ) {
+    // Organize by file type: sort by category, then by size within each category.
+    val grouped = remember(state.items) {
+        state.items
+            .sortedWith(compareBy({ it.category.ordinal }, { -it.sizeBytes }))
+            .groupBy { it.category }
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -182,20 +196,63 @@ private fun ItemList(
             onCheckedChange = { onIntent(ScannerContract.Intent.SelectAllToggled(it)) },
         )
         Text("Select all", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(0.dp))
     }
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        items(state.items, key = { it.id }) { item ->
-            JunkRow(
-                item = item,
-                recommendation = state.recommendations[item.id],
-                onToggle = { onIntent(ScannerContract.Intent.ItemToggled(item.id)) },
-            )
+        grouped.forEach { (category, categoryItems) ->
+            item(key = "header:${category.name}") {
+                CategoryHeader(category, categoryItems.sumOf { it.sizeBytes })
+            }
+            items(categoryItems, key = { it.id }) { item ->
+                JunkRow(
+                    item = item,
+                    recommendation = state.recommendations[item.id],
+                    onToggle = { onIntent(ScannerContract.Intent.ItemToggled(item.id)) },
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun CategoryHeader(category: JunkCategory, totalBytes: Long) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(categoryColor(category)))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            category.label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            formatSize(totalBytes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Stable accent color per category, for the grouped-list dots. */
+@Composable
+private fun categoryColor(category: JunkCategory): Color = when (category) {
+    JunkCategory.CACHE -> Color(0xFF9AA4A6)
+    JunkCategory.TEMP -> Color(0xFFB0BEC5)
+    JunkCategory.LOGS -> Color(0xFF8D9EA3)
+    JunkCategory.DOCUMENT -> Color(0xFF4F86C6)
+    JunkCategory.IMAGE -> Color(0xFF6AB187)
+    JunkCategory.AUDIO -> Color(0xFFC77DFF)
+    JunkCategory.VIDEO -> Color(0xFFE5789B)
+    JunkCategory.ARCHIVE -> Color(0xFFE2A336)
+    JunkCategory.MODEL -> Color(0xFF0FB5AE)
+    JunkCategory.CODE -> Color(0xFF7E8CE0)
+    JunkCategory.LARGE_FILE -> Color(0xFFE5884D)
+    JunkCategory.OTHER -> Color(0xFF9E9E9E)
 }
 
 @Composable

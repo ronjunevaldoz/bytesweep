@@ -1,6 +1,7 @@
 package io.github.ronjunevaldoz.bytesweep.data
 
 import io.github.ronjunevaldoz.bytesweep.domain.StorageScanner
+import io.github.ronjunevaldoz.bytesweep.model.FileClassifier
 import io.github.ronjunevaldoz.bytesweep.model.JunkCategory
 import io.github.ronjunevaldoz.bytesweep.model.JunkItem
 import io.github.ronjunevaldoz.bytesweep.model.ScanResult
@@ -40,11 +41,7 @@ class DesktopStorageScanner : StorageScanner {
         return children.mapNotNull { child ->
             val size = sizeOf(child)
             if (size <= 0) return@mapNotNull null
-            val cat = when {
-                child.isFile && child.extension.equals("log", ignoreCase = true) -> JunkCategory.LOGS
-                child.isFile && size > 100_000_000 -> JunkCategory.LARGE_FILE
-                else -> category
-            }
+            val cat = FileClassifier.classify(child.name, size, fallback = category)
             JunkItem(
                 id = child.absolutePath,
                 name = child.name,

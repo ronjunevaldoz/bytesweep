@@ -1,10 +1,21 @@
 package io.github.ronjunevaldoz.bytesweep.model
 
-/** A category of reclaimable junk surfaced by a [io.github.ronjunevaldoz.bytesweep.domain.StorageScanner]. */
+/**
+ * The kind of a scanned item. Junk buckets (cache/temp/logs) come first, then real
+ * file-type categories used to organize the rest of storage. Display order follows the
+ * declaration order.
+ */
 enum class JunkCategory(val label: String) {
     CACHE("App cache"),
     TEMP("Temporary files"),
     LOGS("Log files"),
+    DOCUMENT("Documents"),
+    IMAGE("Images"),
+    AUDIO("Audio & music"),
+    VIDEO("Video"),
+    ARCHIVE("Archives"),
+    MODEL("AI models"),
+    CODE("Code & data"),
     LARGE_FILE("Large files"),
     OTHER("Other"),
 }
