@@ -48,7 +48,7 @@ class ScannerContentScreenshotTest {
     @Test
     fun scanner_results() = capture("scanner_results") {
         ScannerContent(
-            ScannerContract.State(hasScanned = true, items = sample),
+            ScannerContract.State(hasScanned = true, canOpenLocations = true, items = sample),
             SnackbarHostState(),
             onIntent = {},
         )
@@ -68,6 +68,7 @@ class ScannerContentScreenshotTest {
         ScannerContent(
             ScannerContract.State(
                 hasScanned = true,
+                canOpenLocations = true,
                 items = sample,
                 analysisSummary = "Most items are regenerable caches; review the 256 MB backup before deleting.",
                 recommendations = mapOf(

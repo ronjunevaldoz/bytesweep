@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.ronjunevaldoz.bytesweep.analysis.Recommendation
@@ -209,7 +211,9 @@ private fun ItemList(
                 JunkRow(
                     item = item,
                     recommendation = state.recommendations[item.id],
+                    canOpenLocation = state.canOpenLocations,
                     onToggle = { onIntent(ScannerContract.Intent.ItemToggled(item.id)) },
+                    onOpenLocation = { onIntent(ScannerContract.Intent.OpenLocationClicked(item.id)) },
                 )
             }
         }
@@ -256,7 +260,13 @@ private fun categoryColor(category: JunkCategory): Color = when (category) {
 }
 
 @Composable
-private fun JunkRow(item: JunkItem, recommendation: Recommendation?, onToggle: () -> Unit) {
+private fun JunkRow(
+    item: JunkItem,
+    recommendation: Recommendation?,
+    canOpenLocation: Boolean,
+    onToggle: () -> Unit,
+    onOpenLocation: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -265,7 +275,13 @@ private fun JunkRow(item: JunkItem, recommendation: Recommendation?, onToggle: (
             Checkbox(checked = item.selected, onCheckedChange = { onToggle() })
             Column(Modifier.weight(1f)) {
                 Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                Text(item.category.label, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    item.path,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 recommendation?.let {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SafetyBadge(it.safety)
@@ -275,6 +291,14 @@ private fun JunkRow(item: JunkItem, recommendation: Recommendation?, onToggle: (
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+                if (canOpenLocation) {
+                    TextButton(
+                        onClick = onOpenLocation,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp),
+                    ) {
+                        Text("Open location", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import io.github.ronjunevaldoz.bytesweep.analysis.AnalyzeResponse
 import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
+import io.github.ronjunevaldoz.bytesweep.domain.FileLocationOpener
 import io.github.ronjunevaldoz.bytesweep.domain.JunkAnalysisService
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.StorageScanner
@@ -40,6 +41,10 @@ private class FakeAnalysisService : JunkAnalysisService {
         AnalyzeResponse(recommendations = emptyList(), summary = "ok")
 }
 
+private class FakeFileLocationOpener(override val isSupported: Boolean = true) : FileLocationOpener {
+    override suspend fun open(item: JunkItem) = true
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
 
@@ -60,6 +65,7 @@ class ScannerViewModelTest {
             ScanStorageUseCase(FakeScanner(sample)),
             CleanJunkUseCase(FakeScanner(sample)),
             AnalyzeJunkUseCase(FakeAnalysisService()),
+            FakeFileLocationOpener(isSupported = false),
         )
         vm.state.test {
             assertEquals(ScannerContract.State(), awaitItem()) // initial
@@ -79,6 +85,7 @@ class ScannerViewModelTest {
             ScanStorageUseCase(scanner),
             CleanJunkUseCase(scanner),
             AnalyzeJunkUseCase(FakeAnalysisService()),
+            FakeFileLocationOpener(),
         )
         vm.onIntent(ScannerContract.Intent.ScanClicked)
         vm.state.test {

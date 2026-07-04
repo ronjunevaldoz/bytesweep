@@ -3,6 +3,7 @@ package io.github.ronjunevaldoz.bytesweep.presenter
 import io.github.ronjunevaldoz.bytesweep.core.mvi.MviViewModel
 import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
+import io.github.ronjunevaldoz.bytesweep.domain.FileLocationOpener
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.ui.util.formatSize
 
@@ -10,8 +11,9 @@ class ScannerViewModel(
     private val scanStorage: ScanStorageUseCase,
     private val cleanJunk: CleanJunkUseCase,
     private val analyzeJunk: AnalyzeJunkUseCase,
+    private val fileLocationOpener: FileLocationOpener,
 ) : MviViewModel<ScannerContract.State, ScannerContract.Intent, ScannerContract.Effect>(
-    initialState = ScannerContract.State(),
+    initialState = ScannerContract.State(canOpenLocations = fileLocationOpener.isSupported),
 ) {
 
     override suspend fun handleIntent(intent: ScannerContract.Intent) {
@@ -19,6 +21,7 @@ class ScannerViewModel(
             ScannerContract.Intent.ScanClicked -> scan()
             ScannerContract.Intent.CleanClicked -> clean()
             ScannerContract.Intent.AnalyzeClicked -> analyze()
+            is ScannerContract.Intent.OpenLocationClicked -> openLocation(intent.id)
             ScannerContract.Intent.ErrorDismissed -> updateState { copy(error = null) }
 
             is ScannerContract.Intent.ItemToggled -> updateState {
@@ -97,5 +100,13 @@ class ScannerViewModel(
             .onFailure { e ->
                 updateState { copy(isAnalyzing = false, error = e.message ?: "Analysis failed") }
             }
+    }
+
+    private suspend fun openLocation(id: String) {
+        val item = state.value.items.find { it.id == id } ?: return
+        val opened = runCatching { fileLocationOpener.open(item) }.getOrDefault(false)
+        if (!opened) {
+            sendEffect(ScannerContract.Effect.ShowMessage("Couldn't open the file location"))
+        }
     }
 }

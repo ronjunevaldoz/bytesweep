@@ -1,0 +1,39 @@
+- generic [ref=e6]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic: Reclaimable
+          - generic: 5.4 GB
+          - generic: 9 items • Web with Kotlin/Wasm
+        - button "Scan storage"
+        - button "Analyze with AI (optional)"
+        - button
+        - generic: Select all
+        - list:
+          - generic: Video
+          - generic: 488.2 MB
+          - generic:
+            - button
+            - generic: trip.mp4
+            - generic: Video
+            - generic: 488.2 MB
+          - generic: Archives
+          - generic: 244.1 MB
+          - generic:
+            - button
+            - generic: old-backup.zip
+            - generic: Archives
+            - generic: 244.1 MB
+          - generic: AI models
+          - generic: 4.5 GB
+          - generic:
+            - button
+            - generic: llama-3-8b.Q4_K_M.gguf
+            - generic: AI models
+            - generic: 4.5 GB
+        - generic:
+          - generic:
+            - generic:
+              - generic: Bytesweep
+        - button "Clean 5.4 GB"
