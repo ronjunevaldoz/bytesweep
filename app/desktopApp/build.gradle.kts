@@ -21,8 +21,11 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "io.github.ronjunevaldoz.bytesweep"
+            packageName = "Bytesweep"
+            // MSI requires a version whose major component is > 0.
             packageVersion = "1.0.0"
+            description = "Cross-platform storage cleaner"
+            vendor = "ronjunevaldoz"
         }
     }
 }
