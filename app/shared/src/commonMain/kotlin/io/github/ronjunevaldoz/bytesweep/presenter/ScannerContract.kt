@@ -11,6 +11,7 @@ object ScannerContract {
         val isAnalyzing: Boolean = false,
         val hasScanned: Boolean = false,
         val canOpenLocations: Boolean = false,
+        val canPickFolder: Boolean = false,
         val items: List<JunkItem> = emptyList(),
         val recommendations: Map<String, Recommendation> = emptyMap(),
         val analysisSummary: String? = null,
@@ -27,6 +28,7 @@ object ScannerContract {
 
     sealed interface Intent {
         data object ScanClicked : Intent
+        data object PickFolderClicked : Intent
         data class ItemToggled(val id: String) : Intent
         data class SelectAllToggled(val selected: Boolean) : Intent
         data object CleanClicked : Intent

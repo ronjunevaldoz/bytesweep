@@ -4,6 +4,7 @@ import io.github.ronjunevaldoz.bytesweep.core.mvi.MviViewModel
 import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.FileLocationOpener
+import io.github.ronjunevaldoz.bytesweep.domain.FolderScanner
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.ui.util.formatSize
 
@@ -12,13 +13,18 @@ class ScannerViewModel(
     private val cleanJunk: CleanJunkUseCase,
     private val analyzeJunk: AnalyzeJunkUseCase,
     private val fileLocationOpener: FileLocationOpener,
+    private val folderScanner: FolderScanner,
 ) : MviViewModel<ScannerContract.State, ScannerContract.Intent, ScannerContract.Effect>(
-    initialState = ScannerContract.State(canOpenLocations = fileLocationOpener.isSupported),
+    initialState = ScannerContract.State(
+        canOpenLocations = fileLocationOpener.isSupported,
+        canPickFolder = folderScanner.isSupported,
+    ),
 ) {
 
     override suspend fun handleIntent(intent: ScannerContract.Intent) {
         when (intent) {
             ScannerContract.Intent.ScanClicked -> scan()
+            ScannerContract.Intent.PickFolderClicked -> pickFolder()
             ScannerContract.Intent.CleanClicked -> clean()
             ScannerContract.Intent.AnalyzeClicked -> analyze()
             is ScannerContract.Intent.OpenLocationClicked -> openLocation(intent.id)
@@ -99,6 +105,36 @@ class ScannerViewModel(
             }
             .onFailure { e ->
                 updateState { copy(isAnalyzing = false, error = e.message ?: "Analysis failed") }
+            }
+    }
+
+    private suspend fun pickFolder() {
+        if (state.value.isScanning) return
+        updateState {
+            copy(
+                isScanning = true,
+                error = null,
+                lastReclaimedBytes = null,
+                recommendations = emptyMap(),
+                analysisSummary = null,
+            )
+        }
+        runCatching { folderScanner.pickAndScan() }
+            .onSuccess { result ->
+                if (result == null) {
+                    updateState { copy(isScanning = false) } // user cancelled the chooser
+                } else {
+                    updateState { copy(isScanning = false, hasScanned = true, items = result.items) }
+                    val msg = if (result.items.isEmpty()) {
+                        "No files found in that folder"
+                    } else {
+                        "Found ${formatSize(result.totalBytes)} across ${result.items.size} items"
+                    }
+                    sendEffect(ScannerContract.Effect.ShowMessage(msg))
+                }
+            }
+            .onFailure { e ->
+                updateState { copy(isScanning = false, error = e.message ?: "Folder scan failed") }
             }
     }
 

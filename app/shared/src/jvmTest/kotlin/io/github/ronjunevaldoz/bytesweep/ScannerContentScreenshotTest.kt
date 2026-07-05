@@ -42,13 +42,18 @@ class ScannerContentScreenshotTest {
 
     @Test
     fun scanner_idle() = capture("scanner_idle") {
-        ScannerContent(ScannerContract.State(), SnackbarHostState(), onIntent = {})
+        ScannerContent(ScannerContract.State(canPickFolder = true), SnackbarHostState(), onIntent = {})
     }
 
     @Test
     fun scanner_results() = capture("scanner_results") {
         ScannerContent(
-            ScannerContract.State(hasScanned = true, canOpenLocations = true, items = sample),
+            ScannerContract.State(
+                hasScanned = true,
+                canOpenLocations = true,
+                canPickFolder = true,
+                items = sample,
+            ),
             SnackbarHostState(),
             onIntent = {},
         )
@@ -57,7 +62,7 @@ class ScannerContentScreenshotTest {
     @Test
     fun scanner_empty() = capture("scanner_empty") {
         ScannerContent(
-            ScannerContract.State(hasScanned = true, items = emptyList()),
+            ScannerContract.State(hasScanned = true, canPickFolder = true, items = emptyList()),
             SnackbarHostState(),
             onIntent = {},
         )
@@ -69,6 +74,7 @@ class ScannerContentScreenshotTest {
             ScannerContract.State(
                 hasScanned = true,
                 canOpenLocations = true,
+                canPickFolder = true,
                 items = sample,
                 analysisSummary = "Most items are regenerable caches; review the 256 MB backup before deleting.",
                 recommendations = mapOf(

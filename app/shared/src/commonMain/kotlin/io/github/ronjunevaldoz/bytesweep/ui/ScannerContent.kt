@@ -95,6 +95,17 @@ fun ScannerContent(
                 Text(if (state.isScanning) "Scanning…" else "Scan storage")
             }
 
+            if (state.canPickFolder) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onIntent(ScannerContract.Intent.PickFolderClicked) },
+                    enabled = !state.isScanning && !state.isCleaning,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Scan a folder…")
+                }
+            }
+
             // Low-priority, optional AI analysis — a subtle text action, not co-equal with Scan.
             if (state.items.isNotEmpty()) {
                 TextButton(

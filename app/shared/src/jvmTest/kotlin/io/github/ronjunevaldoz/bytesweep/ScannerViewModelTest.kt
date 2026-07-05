@@ -5,6 +5,7 @@ import io.github.ronjunevaldoz.bytesweep.analysis.AnalyzeResponse
 import io.github.ronjunevaldoz.bytesweep.domain.AnalyzeJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.CleanJunkUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.FileLocationOpener
+import io.github.ronjunevaldoz.bytesweep.domain.FolderScanner
 import io.github.ronjunevaldoz.bytesweep.domain.JunkAnalysisService
 import io.github.ronjunevaldoz.bytesweep.domain.ScanStorageUseCase
 import io.github.ronjunevaldoz.bytesweep.domain.StorageScanner
@@ -45,6 +46,10 @@ private class FakeFileLocationOpener(override val isSupported: Boolean = true) :
     override suspend fun open(item: JunkItem) = true
 }
 
+private class FakeFolderScanner(override val isSupported: Boolean = false) : FolderScanner {
+    override suspend fun pickAndScan() = null
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
 
@@ -66,6 +71,8 @@ class ScannerViewModelTest {
             CleanJunkUseCase(FakeScanner(sample)),
             AnalyzeJunkUseCase(FakeAnalysisService()),
             FakeFileLocationOpener(isSupported = false),
+
+            FakeFolderScanner(),
         )
         vm.state.test {
             assertEquals(ScannerContract.State(), awaitItem()) // initial
@@ -86,6 +93,8 @@ class ScannerViewModelTest {
             CleanJunkUseCase(scanner),
             AnalyzeJunkUseCase(FakeAnalysisService()),
             FakeFileLocationOpener(),
+
+            FakeFolderScanner(),
         )
         vm.onIntent(ScannerContract.Intent.ScanClicked)
         vm.state.test {
