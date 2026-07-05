@@ -25,7 +25,11 @@ class ScannerViewModel(
         when (intent) {
             ScannerContract.Intent.ScanClicked -> scan()
             ScannerContract.Intent.PickFolderClicked -> pickFolder()
-            ScannerContract.Intent.CleanClicked -> clean()
+            ScannerContract.Intent.CleanClicked ->
+                // Deleting real user-chosen files needs a confirmation; junk is deleted directly.
+                if (state.value.scannedViaFolder) updateState { copy(pendingClean = true) } else clean()
+            ScannerContract.Intent.ConfirmCleanClicked -> deleteFolderItems()
+            ScannerContract.Intent.CancelCleanClicked -> updateState { copy(pendingClean = false) }
             ScannerContract.Intent.AnalyzeClicked -> analyze()
             is ScannerContract.Intent.OpenLocationClicked -> openLocation(intent.id)
             ScannerContract.Intent.ErrorDismissed -> updateState { copy(error = null) }
@@ -49,6 +53,8 @@ class ScannerViewModel(
                 lastReclaimedBytes = null,
                 recommendations = emptyMap(),
                 analysisSummary = null,
+                scannedViaFolder = false,
+                pendingClean = false,
             )
         }
         runCatching { scanStorage() }
@@ -117,6 +123,7 @@ class ScannerViewModel(
                 lastReclaimedBytes = null,
                 recommendations = emptyMap(),
                 analysisSummary = null,
+                pendingClean = false,
             )
         }
         runCatching { folderScanner.pickAndScan() }
@@ -124,7 +131,14 @@ class ScannerViewModel(
                 if (result == null) {
                     updateState { copy(isScanning = false) } // user cancelled the chooser
                 } else {
-                    updateState { copy(isScanning = false, hasScanned = true, items = result.items) }
+                    updateState {
+                        copy(
+                            isScanning = false,
+                            hasScanned = true,
+                            scannedViaFolder = true,
+                            items = result.items,
+                        )
+                    }
                     val msg = if (result.items.isEmpty()) {
                         "No files found in that folder"
                     } else {
@@ -135,6 +149,30 @@ class ScannerViewModel(
             }
             .onFailure { e ->
                 updateState { copy(isScanning = false, error = e.message ?: "Folder scan failed") }
+            }
+    }
+
+    private suspend fun deleteFolderItems() {
+        val toDelete = state.value.selectedItems
+        if (toDelete.isEmpty()) {
+            updateState { copy(pendingClean = false) }
+            return
+        }
+        updateState { copy(isCleaning = true, pendingClean = false, error = null) }
+        runCatching { folderScanner.delete(toDelete) }
+            .onSuccess { reclaimed ->
+                val ids = toDelete.map { it.id }.toSet()
+                updateState {
+                    copy(
+                        isCleaning = false,
+                        items = items.filterNot { it.id in ids },
+                        lastReclaimedBytes = reclaimed,
+                    )
+                }
+                sendEffect(ScannerContract.Effect.ShowMessage("Deleted ${formatSize(reclaimed)}"))
+            }
+            .onFailure { e ->
+                updateState { copy(isCleaning = false, error = e.message ?: "Delete failed") }
             }
     }
 

@@ -19,11 +19,21 @@ import javax.swing.SwingUtilities
 class DesktopFolderScanner : FolderScanner {
 
     override val isSupported: Boolean = true
+    override val canDelete: Boolean = true
 
     override suspend fun pickAndScan(): ScanResult? = withContext(Dispatchers.IO) {
         val dir = chooseDirectory() ?: return@withContext null
         val items = scanDirectory(dir)
         ScanResult(items)
+    }
+
+    override suspend fun delete(items: List<JunkItem>): Long = withContext(Dispatchers.IO) {
+        var reclaimed = 0L
+        for (item in items) {
+            val file = File(item.path)
+            if (file.exists() && file.deleteRecursively()) reclaimed += item.sizeBytes
+        }
+        reclaimed
     }
 
     /** Shows a DIRECTORIES_ONLY chooser on the EDT and returns the selection. */

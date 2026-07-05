@@ -47,7 +47,9 @@ private class FakeFileLocationOpener(override val isSupported: Boolean = true) :
 }
 
 private class FakeFolderScanner(override val isSupported: Boolean = false) : FolderScanner {
+    override val canDelete: Boolean = isSupported
     override suspend fun pickAndScan() = null
+    override suspend fun delete(items: List<JunkItem>) = items.sumOf { it.sizeBytes }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,9 +73,11 @@ fun ScannerContent(
                     enabled = state.canClean,
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                 ) {
+                    val verb = if (state.scannedViaFolder) "Delete" else "Clean"
+                    val progress = if (state.scannedViaFolder) "Deleting…" else "Cleaning…"
                     Text(
-                        if (state.isCleaning) "Cleaning…"
-                        else "Clean ${formatSize(state.selectedBytes)}",
+                        if (state.isCleaning) progress
+                        else "$verb ${formatSize(state.selectedBytes)}",
                     )
                 }
             }
@@ -161,6 +164,30 @@ fun ScannerContent(
                 state.hasScanned && !state.isScanning -> EmptyState()
                 else -> Unit
             }
+        }
+
+        if (state.pendingClean) {
+            AlertDialog(
+                onDismissRequest = { onIntent(ScannerContract.Intent.CancelCleanClicked) },
+                title = { Text("Delete files?") },
+                text = {
+                    Text(
+                        "This permanently deletes ${state.selectedItems.size} selected " +
+                            "file(s) (${formatSize(state.selectedBytes)}) from the chosen folder. " +
+                            "This can't be undone.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { onIntent(ScannerContract.Intent.ConfirmCleanClicked) }) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { onIntent(ScannerContract.Intent.CancelCleanClicked) }) {
+                        Text("Cancel")
+                    }
+                },
+            )
         }
     }
 }
